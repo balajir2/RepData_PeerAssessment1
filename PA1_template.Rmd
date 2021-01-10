@@ -4,22 +4,99 @@ output:
   html_document:
     keep_md: true
 ---
+# Set the working directory
+setwd("D:/2020/Education/Data Science/Course 5/week 2/RepData_PeerAssessment1/activity")
 
+# Include the library that would be used
+library(dplyr)
+library(ggplot2)
+library(lubridate)
 
 ## Loading and preprocessing the data
+# Read the file into a variable activity
+activity<-read.csv("activity.csv")
 
+# Make the column date usable
+activity$date<-ymd(activity$date)
 
+# Add the week of the day as a column
+day<-weekdays(activity$date)
+activity<-cbind(activity,day)
 
 ## What is mean total number of steps taken per day?
+activityTotalSteps <- with(activity, aggregate(steps, by = list(date), sum, na.rm = TRUE))
+names(activityTotalSteps) <- c("Date", "Steps")
 
+#Create histogram 
+hist(activityTotalSteps$Steps, col="yellow", border="red", xlim=c(0,30000),breaks=10, main=" Histograms of Activity - Steps per day",xlab="Number of Steps", ylab="Number of days")
 
+# Mean and Median of the steps per day
+mean(activityTotalSteps$Steps)
+median(activityTotalSteps$Steps)
 
 ## What is the average daily activity pattern?
+averageDailyActivity <- with(activity, aggregate(steps, by = list(interval), FUN=mean, na.rm = TRUE))
+names(averageDailyActivity) <- c("interval", "Mean")
+
+#Converting the variable averageDailyActivity into a dataframe
+#averageDailyActivitydf<-as.data.frame(averageDailyActivity)
+
+## Plot the Graph
+gr<-ggplot(averageDailyActivity,mapping=aes(interval,Mean))+
+geom_line(col="blue")+
+xlab("interval")+
+ylab("Average number of Steps")+
+ggtitle("Average Number of Steps per interval")
+
+print(gr)
+##The 5-minute interval that, on average, contains the maximum number of steps
+averageDailyActivitydf[which.max(averageDailyActivity[,2]),]$interval
 
 
+## Code to describe and show a strategy for imputing missing data
 
-## Imputing missing values
+#Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs
+sum(is.na(activity[,1]))
 
+#Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+# Step1: create a dataframe identical as activity
+activity_f<-activity
+
+# Step 2: create a vector with null value for steps
+activity_nas<-is.na(activity_f$steps)
+
+imputed<-data.frame(activity_f[is.na(activity_f[,1]),])
+# Step2: merge the data containing averageDaily activity and imputed based on interval
+update_imputed<-merge(imputed, averageDailyActivitydf,by="interval")
+activity_f[activity_nas,]$steps<-update_imputed$Mean
+
+# Check for Null Value
+sum(is.na(activity_f$steps))
+
+#Make a histogram of the new dataset
+activity_fTotalSteps <- with(activity_f, aggregate(steps, by = list(date), sum, na.rm = TRUE))
+names(activity_fTotalSteps) <- c("Date", "Steps")
+
+# Mean and Median of the steps per day
+mean(activity_fTotalSteps$Steps)
+median(activity_fTotalSteps$Steps)
+
+hist(activity_fTotalSteps$Steps, col="red", border="yellow", xlim=c(0,30000),breaks=10, main="Histograms of Activity - Steps per day",xlab="Number of Steps", ylab="Number of days")
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+#Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+activity_f<-mutate(activity_f,weektype=ifelse(activity_f$day=="Saturday"|activity_f$day=="Sunday","weekend","weekday"))
+
+interval_steps<-activity_f %>%
+                group_by(interval,weektype) %>%
+                summarise(steps=mean(steps))
+
+gr2<-ggplot(interval_steps, aes(x=interval,y=steps,color=weektype))+
+      geom_line()+
+      facet_wrap(~weektype,ncol=1,nrow=2)
+
+print(gr2)
+
+#From the two plots it seems that the test object is more active earlier in the day during weekdays compared to weekends, but more active throughout the weekends compared with weekdays (probably because the oject is working during the weekdays, hence moving less during the day).
